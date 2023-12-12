@@ -23,6 +23,22 @@ public class MyDedup {
     // private static int mod(int value, int modulus) {
     //     return value & (modulus - 1);
     // }
+    private static class Chunk {
+        byte[] chunkData;
+        int startIndex = 0;
+        int endIndex = 0;
+        int len = 0;
+        String hashVal = "";
+
+        public Chunk(byte[] data, int len) {
+            this.chunkData = data;
+            this.len = len;
+        }
+
+        public Chunk(){
+            this.chunkData = new byte[0];
+        }
+    }
 
     private static int mod(int value, int modulus) {
         return ((value % modulus) + modulus) % modulus;
@@ -48,8 +64,53 @@ public class MyDedup {
             e.printStackTrace();
         }
         
+        List<Chunk> chunkList = new ArrayList<Chunk>();
+        // Chunk procChunk = new Chunk();
         int rfp = 0;
+        int lastAnchor = -1;
+        int currentAnchor = 0;
+        int checkAnchor;
         for (int i = 0; i < fileData.length+1; i++){
+            // Single Chunk can store the whole file
+            // if (maxChunkSize >= fileData.length){
+            //     chunkList.add(new Chunk(fileData, fileData.length));
+            //     break;
+            // }
+
+            // EOF
+            if (i + minChunkSize >= fileData.length) {
+                currentAnchor = fileData.length - 1;
+                byte[] chunkData = Arrays.copyOfRange(fileData, lastAnchor+1, currentAnchor + 1);
+                Chunk newChunk = new Chunk(chunkData, currentAnchor - lastAnchor);
+                newChunk.startIndex = lastAnchor + 1;
+                newChunk.endIndex = currentAnchor;
+                chunkList.add(newChunk);
+                lastAnchor = currentAnchor;
+                for(int x=0; x< newChunk.chunkData.length ; x++) {
+                    System.out.print(newChunk.chunkData[x] +" ");
+                }
+                System.out.println("Chunk len: " + newChunk.len);
+                System.out.println("===========================");
+                break;
+            }
+            // before next Anchor Point, reach maxChunkSize
+            if (((checkAnchor = i + minChunkSize - 1) - lastAnchor) == maxChunkSize) {
+                currentAnchor = checkAnchor;
+                byte[] chunkData = Arrays.copyOfRange(fileData, lastAnchor+1, currentAnchor + 1);
+                Chunk newChunk = new Chunk(chunkData, currentAnchor - lastAnchor);
+                newChunk.startIndex = lastAnchor + 1;
+                newChunk.endIndex = currentAnchor;
+                chunkList.add(newChunk);
+                lastAnchor = currentAnchor;
+                for(int x=0; x< newChunk.chunkData.length ; x++) {
+                    System.out.print(newChunk.chunkData[x] +" ");
+                }
+                System.out.println("Chunk len: " + newChunk.len);
+                System.out.println("===========================");
+                i += minChunkSize;
+                continue;
+            }
+            // Calculate RFP
             if (i == 0){
                 for (int j = 0; j < minChunkSize; j++){
                     rfp += fileData[j] * (int) Math.pow(base, minChunkSize-1-j);
@@ -66,6 +127,22 @@ public class MyDedup {
                 rfp = modAdd(dSecModMult, fileData[i + minChunkSize - 1], avgChunkSize);
                 // rfp = mod((base * (tmp - baseTsModMult) + fileData[i + minChunkSize - 1]), avgChunkSize);
                  System.out.println("next rfp = " + rfp);
+            }
+            if (rfp == 0) {
+                currentAnchor = i + minChunkSize - 1;
+                System.out.println("currentAnchor: " + currentAnchor);
+                byte[] chunkData = Arrays.copyOfRange(fileData, lastAnchor+1, currentAnchor + 1);
+                Chunk newChunk = new Chunk(chunkData, currentAnchor - lastAnchor);
+                newChunk.startIndex = lastAnchor + 1;
+                newChunk.endIndex = currentAnchor;
+                chunkList.add(newChunk);
+                lastAnchor = currentAnchor;
+                for(int x=0; x< newChunk.chunkData.length ; x++) {
+                    System.out.print(newChunk.chunkData[x] +" ");
+                }
+                System.out.println("Chunk len: " + newChunk.len);
+                System.out.println("===========================");
+                i += minChunkSize;
             }
         }
     }

@@ -46,7 +46,7 @@ public class MyDedup {
         // public Map<String, List<String>> fileRecipe;
         public Map<String, String> hashIndex;
         public double bytesPreDedup, bytesUnique;
-        public int preDedupNum, uniqueNum, fileNum;
+        public int preDedupNum, uniqueNum, fileNum, containerNum;
 
         public Index() {
             // fileRecipe = new HashMap<>();
@@ -362,6 +362,12 @@ public class MyDedup {
         Index index = new Index();
         FileRecipe procFileRecipe = new FileRecipe();
         index = index.readIndexFromFile("MyDedup.index");
+        if (index.containerNum == 0){
+            procContainer.containerId = 1;
+        }
+        else{
+            procContainer.containerId = index.containerNum + 1;
+        }
         double bytesPreDedup = 0;
         double bytesUnique = 0;
         int uniqueNum = 0;
@@ -403,6 +409,7 @@ public class MyDedup {
         index.bytesPreDedup += bytesPreDedup;
         index.bytesUnique += bytesUnique;
         index.fileNum++;
+        index.containerNum += procContainer.containerId;
         // System.out.println("preDedupNum: " + index.preDedupNum);
         // System.out.println("uniqueNum: " + index.uniqueNum);
         // System.out.println("bytesPreDedup: " + index.bytesPreDedup);

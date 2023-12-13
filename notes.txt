@@ -1,0 +1,10 @@
+./rfp_anchor_linux64 8 16 32 16 0 KJV12.TXT
+m: the window size (in bytes)
+q: the modulo parameter
+x: the maximum chunk size (in bytes)
+d: the base parameter
+v: the matching value that determines if a rabin fingerprint is an anchor point
+
+java MyDedup upload <min_chunk> <avg_chunk> <max_chunk> <d> <file_to_upload>
+
+m q x d (without v)

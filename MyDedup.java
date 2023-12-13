@@ -366,7 +366,7 @@ public class MyDedup {
             procContainer.containerId = 1;
         }
         else{
-            procContainer.containerId = index.containerNum + 1;
+            procContainer.containerId = index.containerNum;
         }
         double bytesPreDedup = 0;
         double bytesUnique = 0;

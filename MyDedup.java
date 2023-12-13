@@ -182,6 +182,7 @@ public class MyDedup {
             } else {
                 // The chunk can't be added due to size limit
                 // save current Cotainer to file
+                saveContainer();
                 containerId++;
                 uniqueChunkList = new ArrayList<>();
                 currentSize = 0;
@@ -377,11 +378,19 @@ public class MyDedup {
                 procFileRecipe.addChunkHash(procChunk.hashVal);
                 if (index.isChunkUnique(procChunk.hashVal)) {
                     // System.out.println("procContainer.uniqueChunkList Size = " + procContainer.uniqueChunkList.size());
-                    index.updateIndex(procChunk.hashVal, procContainer.containerId + "_" + procContainer.uniqueChunkList.size());
+                    // index.updateIndex(procChunk.hashVal, procContainer.containerId + "_" + procContainer.uniqueChunkList.size());
                     bytesUnique += procChunk.len;
                     uniqueNum++;
                     // add to Container
-                    procContainer.addChunk(procChunk);
+                    boolean isChunkAdded = procContainer.addChunk(procChunk);
+                    if (isChunkAdded) {
+                        index.updateIndex(procChunk.hashVal, procContainer.containerId + "_" + (procContainer.uniqueChunkList.size() - 1));
+                        // Rest of your logic
+                    } else {
+                        // Handle the case where chunk will be added to the next container
+                        procContainer.addChunk(procChunk);
+                        index.updateIndex(procChunk.hashVal, procContainer.containerId + "_" + (procContainer.uniqueChunkList.size() - 1));
+                    }
                 }
             } catch (NoSuchAlgorithmException e) {
                 e.printStackTrace();
@@ -428,8 +437,10 @@ public class MyDedup {
         String fileNameWithoutExtension = fileToDownload.substring(0, fileToDownload.lastIndexOf('.'));
         String path = "data//";
         FileRecipe fileRecipe = FileRecipe.readFileRecipeFromFile(fileNameWithoutExtension);
+        Map<Integer, ArrayList<byte[]>> containerCache = new HashMap<>();
+        ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
 
-        try (FileOutputStream fos = new FileOutputStream(localFileName)) {
+        try {
             for (String hash : fileRecipe.hashChunkList) {
                 String hashValue = index.hashIndex.get(hash);
                 String[] parts = hashValue.split("_");
@@ -437,18 +448,29 @@ public class MyDedup {
                     int containerId = Integer.parseInt(parts[0]);
                     int listId = Integer.parseInt(parts[1]);
 
-                    try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(path + "container" + containerId))) {
-                        @SuppressWarnings("unchecked")
-                        ArrayList<byte[]> containerData = (ArrayList<byte[]>) ois.readObject();
-                            byte[] chunk = containerData.get(listId);
-                            fos.write(chunk);
-                    } catch (IOException | ClassNotFoundException e) {
-                        e.printStackTrace();
+                    if (!containerCache.containsKey(containerId)) {
+                        try (ObjectInputStream ois = new ObjectInputStream(new BufferedInputStream(new FileInputStream(path + "container" + containerId)))) {
+                            @SuppressWarnings("unchecked")
+                            ArrayList<byte[]> containerData = (ArrayList<byte[]>) ois.readObject();
+                            containerCache.put(containerId, containerData);
+                        } catch (IOException | ClassNotFoundException e) {
+                            e.printStackTrace();
+                        }
+                    }
+
+                    ArrayList<byte[]> cachedContainerData = containerCache.get(containerId);
+                    if (cachedContainerData != null) {
+                        byte[] chunk = cachedContainerData.get(listId);
+                        byteStream.write(chunk);
                     }
                 }
             }
-        }
-        catch (IOException e) {
+
+            // Writing the accumulated bytes to the output file in one go
+            try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(localFileName))) {
+                byteStream.writeTo(bos);
+            }
+        } catch (IOException e) {
             e.printStackTrace();
         }
         System.out.println("Download Complete");

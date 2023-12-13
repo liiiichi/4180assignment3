@@ -43,14 +43,14 @@ public class MyDedup {
     }
 
     public static class Index implements Serializable {
-        public Map<String, List<String>> fileRecipe;
-        public Map<String, byte[]> chunks;
+        // public Map<String, List<String>> fileRecipe;
+        public Map<String, String> hashIndex;
         public double bytesPreDedup, bytesUnique;
-        public int preDedupNum, uniqueNum;
+        public int preDedupNum, uniqueNum, fileNum;
 
         public Index() {
-            fileRecipe = new HashMap<>();
-            chunks = new HashMap<>();
+            // fileRecipe = new HashMap<>();
+            hashIndex = new HashMap<>();
             bytesPreDedup = 0;
             bytesUnique = 0;
             preDedupNum = 0;
@@ -58,17 +58,17 @@ public class MyDedup {
         }
 
         public boolean isChunkUnique(String hash) {
-            return !chunks.containsKey(hash);
+            return !hashIndex.containsKey(hash);
         }
 
-        public void updateIndex(String hash, byte[] chunkData, String filePath) {
-            if (!fileRecipe.containsKey(filePath)) {
-                fileRecipe.put(filePath, new ArrayList<>());
-            }
-            fileRecipe.get(filePath).add(hash);
+        public void updateIndex(String hash, String chunkAddress) {
+            // if (!fileRecipe.containsKey(filePath)) {
+            //     fileRecipe.put(filePath, new ArrayList<>());
+            // }
+            // fileRecipe.get(filePath).add(hash);
 
-            if (!chunks.containsKey(hash)) {
-                chunks.put(hash, chunkData);
+            if (!hashIndex.containsKey(hash)) {
+                hashIndex.put(hash, chunkAddress);
             }
         }
 
@@ -103,8 +103,59 @@ public class MyDedup {
                 return null;
             }
         }
+    }
 
-        // Other methods...
+    public static class FileRecipe implements Serializable {
+        public List<String> hashChunkList;
+
+        public FileRecipe() {
+            hashChunkList = new ArrayList<>();
+        }
+
+        public void addChunkHash (String hash) {
+            hashChunkList.add(hash);
+        }
+
+        public void saveFileRecipeToFile(String fileName) {
+            try {
+                String recipeFileName = "file//" + fileName;
+                File recipeFile = new File(recipeFileName);
+                if (!recipeFile.exists()) {
+                    recipeFile.createNewFile();  // Create a new file if it doesn't exist
+                }
+                try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(recipeFile))) {
+                    oos.writeObject(this);
+                }
+                catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        public static FileRecipe readFileRecipeFromFile(String fileName) {
+            try {
+                String recipeFileName = "file//" + fileName;
+                File recipeFile = new File(recipeFileName);
+                if (!recipeFile.exists()) {
+                    System.out.println("File recipe does not exist. Returning a new file recipe.");
+                    return new FileRecipe(); // Return a new FileRecipe if the file does not exist
+                }
+                try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(recipeFile))) {
+                    return (FileRecipe) ois.readObject();
+                } 
+                catch (IOException | ClassNotFoundException e) {
+                    e.printStackTrace();
+                    return null;
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                return null;
+            }
+        }
+
     }
 
     public static class Container implements Serializable {
@@ -112,14 +163,14 @@ public class MyDedup {
         public ArrayList<Chunk> uniqueChunkList;
         public int currentSize;
         public int containerId;
-        public String containerName;
+        // public String containerName;
         // Other attributes as needed, like a map for chunk addresses
 
         public Container(String fileName) {
             uniqueChunkList = new ArrayList<>();
             currentSize = 0;
             containerId = 1;
-            containerName = fileName;
+            // containerName = fileName;
         }
 
         public boolean addChunk(Chunk chunk) {
@@ -142,7 +193,7 @@ public class MyDedup {
         public void saveContainer() {
             try {
                 // Create directory for this container
-                String containerFileName = "data//" + containerName + "container" + containerId;
+                String containerFileName = "data//" + "container" + containerId;
                 File containerFile = new File(containerFileName);
                 if (!containerFile.exists()) {
                     containerFile.createNewFile(); // Create the directory if it doesn't exist
@@ -190,10 +241,19 @@ public class MyDedup {
     }
 
     public static void upload(int minChunkSize, int avgChunkSize, int maxChunkSize, int base, String filePath){
-        File Folder = new File("data/");
-        if (!Folder.exists()){
+        File dataFolder = new File("data/");
+        if (!dataFolder.exists()){
             try{
-                Folder.mkdir();
+                dataFolder.mkdir();
+                System.out.println("Data folder do not exist, created new folder");
+            }catch (Exception e){
+                e.getStackTrace();
+            }
+        }
+        File recipeFolder = new File("file/");
+        if (!recipeFolder.exists()){
+            try{
+                recipeFolder.mkdir();
                 System.out.println("Data folder do not exist, created new folder");
             }catch (Exception e){
                 e.getStackTrace();
@@ -210,8 +270,8 @@ public class MyDedup {
         Path path = Paths.get(filePath);
         fileData = Files.readAllBytes(path);
         // System.out.println("Data sequence: " + fileData[8]);
-        double fileSize = Files.size(path); // Get file size
-        System.out.println("File size: " + fileSize + " bytes");
+        // double fileSize = Files.size(path); // Get file size
+        // System.out.println("File size: " + fileSize + " bytes");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -299,6 +359,7 @@ public class MyDedup {
 
         Container procContainer = new Container(fileName);
         Index index = new Index();
+        FileRecipe procFileRecipe = new FileRecipe();
         index = index.readIndexFromFile("MyDedup.index");
         double bytesPreDedup = 0;
         double bytesUnique = 0;
@@ -313,26 +374,30 @@ public class MyDedup {
                 byte[] checkSumBytes = md.digest();
                 procChunk.hashVal = byteArrayToHexString(checkSumBytes);
                 System.out.println("checkSumStr: " + procChunk.hashVal);
+                procFileRecipe.addChunkHash(procChunk.hashVal);
                 if (index.isChunkUnique(procChunk.hashVal)) {
+                    // System.out.println("procContainer.uniqueChunkList Size = " + procContainer.uniqueChunkList.size());
+                    index.updateIndex(procChunk.hashVal, procContainer.containerId + "_" + procContainer.uniqueChunkList.size());
                     bytesUnique += procChunk.len;
                     uniqueNum++;
                     // add to Container
                     procContainer.addChunk(procChunk);
                 }
-                index.updateIndex(procChunk.hashVal, procChunk.chunkData, filePath);
             } catch (NoSuchAlgorithmException e) {
                 e.printStackTrace();
             }
         }
+        procFileRecipe.saveFileRecipeToFile(fileName);
         System.out.println("===========================");
         index.preDedupNum += chunkList.size();
         index.uniqueNum += uniqueNum;
         index.bytesPreDedup += bytesPreDedup;
         index.bytesUnique += bytesUnique;
-        System.out.println("preDedupNum: " + index.preDedupNum);
-        System.out.println("uniqueNum: " + index.uniqueNum);
-        System.out.println("bytesPreDedup: " + index.bytesPreDedup);
-        System.out.println("bytesUnique: " + index.bytesUnique);
+        index.fileNum++;
+        // System.out.println("preDedupNum: " + index.preDedupNum);
+        // System.out.println("uniqueNum: " + index.uniqueNum);
+        // System.out.println("bytesPreDedup: " + index.bytesPreDedup);
+        // System.out.println("bytesUnique: " + index.bytesUnique);
         index.saveIndexToFile("MyDedup.index");
         if (procContainer.currentSize < procContainer.MAX_SIZE && procContainer.currentSize != 0) {
             procContainer.saveContainer();
@@ -349,7 +414,7 @@ public class MyDedup {
         //System.out.println("filePath: " + (fileName + "container" + procContainer.containerId));
         System.out.println("===========================");
         System.out.println("Report Output:");
-        System.out.println("Total number of files that have been stored: " + result.fileRecipe.size());
+        System.out.println("Total number of files that have been stored: " + result.fileNum);
         System.out.println("Total number of pre-deduplicated chunks in storage: " + result.preDedupNum);
         System.out.println("Total number of unique chunks in storage: " + result.uniqueNum);
         System.out.println("Total number of bytes of pre-deduplicated chunks in storage: " + result.bytesPreDedup);
@@ -360,29 +425,27 @@ public class MyDedup {
     }
 
     public static void download(Index index, String fileToDownload, String localFileName) {
-        ArrayList<byte[]> chunkData = new ArrayList<byte[]>();
-        ArrayList<byte[]> allChunkData = new ArrayList<byte[]>();
-        if (!index.fileRecipe.containsKey(fileToDownload)) {
-            System.err.println("No such file");
-            System.exit(1);
-        }
+        String fileNameWithoutExtension = fileToDownload.substring(0, fileToDownload.lastIndexOf('.'));
+        String path = "data//";
+        FileRecipe fileRecipe = FileRecipe.readFileRecipeFromFile(fileNameWithoutExtension);
+
         try (FileOutputStream fos = new FileOutputStream(localFileName)) {
-            String path = "data//";
-            File Folder = new File(path);
-            for (File file : Folder.listFiles()) {
-                try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(path + file.getName()))) {
-                    @SuppressWarnings("unchecked")  // Suppress the unchecked warning
-                    ArrayList<byte[]> tempChunkData = (ArrayList<byte[]>) ois.readObject();
-                    for (byte[] data : chunkData) {
-                        allChunkData.add(data);
+            for (String hash : fileRecipe.hashChunkList) {
+                String hashValue = index.hashIndex.get(hash);
+                String[] parts = hashValue.split("_");
+                if (parts.length == 2) {
+                    int containerId = Integer.parseInt(parts[0]);
+                    int listId = Integer.parseInt(parts[1]);
+
+                    try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(path + "container" + containerId))) {
+                        @SuppressWarnings("unchecked")
+                        ArrayList<byte[]> containerData = (ArrayList<byte[]>) ois.readObject();
+                            byte[] chunk = containerData.get(listId);
+                            fos.write(chunk);
+                    } catch (IOException | ClassNotFoundException e) {
+                        e.printStackTrace();
                     }
                 }
-                catch (IOException | ClassNotFoundException e) {
-                    e.printStackTrace();
-                }
-            }
-            for (String checkSumStr : index.fileRecipe.get(fileToDownload)) {
-                fos.write(index.chunks.get(checkSumStr));
             }
         }
         catch (IOException e) {
@@ -390,6 +453,7 @@ public class MyDedup {
         }
         System.out.println("Download Complete");
     }
+
     public static void main(String[] args) {
         if (args.length != 6 && args.length != 3) {
             System.err.println("Usage: java MyDedup upload <min_chunk> <avg_chunk> <max_chunk> <d> <file_to_upload>");
@@ -410,7 +474,6 @@ public class MyDedup {
             Index index = new Index();
             index = index.readIndexFromFile("MyDedup.index");
             System.out.println("Downloading");
-            System.out.println("file Recipe: " + index.fileRecipe);
             // System.out.println("chunks: " + index.chunks.get("83a002e8ffbe10a8e5bfd289b565b247092a9b70")[0]);
             String fileToDownload = args[1];
             String localFileName = args[2];

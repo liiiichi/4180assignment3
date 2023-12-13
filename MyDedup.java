@@ -81,7 +81,11 @@ public class MyDedup {
                 try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(file))) {
                     oos.writeObject(this);
                 }
-            } catch (IOException e) {
+                catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            catch (IOException e) {
                 e.printStackTrace();
             }
         }
@@ -150,6 +154,9 @@ public class MyDedup {
 
                 try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(containerFile))) {
                     oos.writeObject(chunkDataList);
+                }
+                catch (IOException e) {
+                    e.printStackTrace();
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -349,20 +356,70 @@ public class MyDedup {
         System.out.println("Total number of bytes of unique chunks in storage: "+ result.bytesUnique);
         System.out.println("Total number of containers in storage: " + procContainer.containerId);
         System.out.printf("Deduplication ratio: %.2f\n", deDupRatio);
+        System.out.println("Upload Complete");
     }
 
-    public static void main(String[] args) {
-        if (args.length != 6) {
-            System.err.println("Usage: java MyDedup upload <min_chunk> <avg_chunk> <max_chunk> <d> <file_to_upload>" + args.length);
+    public static void download(Index index, String fileToDownload, String localFileName) {
+        ArrayList<byte[]> chunkData = new ArrayList<byte[]>();
+        ArrayList<byte[]> allChunkData = new ArrayList<byte[]>();
+        if (!index.fileRecipe.containsKey(fileToDownload)) {
+            System.err.println("No such file");
             System.exit(1);
         }
-        System.out.println("Start Upload");
-        int minChunkSize = Integer.parseInt(args[1]);
-        int avgChunkSize = Integer.parseInt(args[2]);
-        int maxChunkSize = Integer.parseInt(args[3]);
-        int base = Integer.parseInt(args[4]);
-        String filePath = args[5];
-        System.out.println("filePath: " + filePath);
+        try (FileOutputStream fos = new FileOutputStream(localFileName)) {
+            String path = "data//";
+            File Folder = new File(path);
+            for (File file : Folder.listFiles()) {
+                try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(path + file.getName()))) {
+                    @SuppressWarnings("unchecked")  // Suppress the unchecked warning
+                    ArrayList<byte[]> tempChunkData = (ArrayList<byte[]>) ois.readObject();
+                    for (byte[] data : chunkData) {
+                        allChunkData.add(data);
+                    }
+                }
+                catch (IOException | ClassNotFoundException e) {
+                    e.printStackTrace();
+                }
+            }
+            for (String checkSumStr : index.fileRecipe.get(fileToDownload)) {
+                fos.write(index.chunks.get(checkSumStr));
+            }
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+        System.out.println("Download Complete");
+    }
+    public static void main(String[] args) {
+        if (args.length != 6 && args.length != 3) {
+            System.err.println("Usage: java MyDedup upload <min_chunk> <avg_chunk> <max_chunk> <d> <file_to_upload>");
+            System.err.println("Usage: java MyDedup download <file_to_download> <local_file_name>");
+            System.exit(1);
+        }
+
+        if (args[0].equals("upload")) {
+            System.out.println("Uploading");
+            int minChunkSize = Integer.parseInt(args[1]);
+            int avgChunkSize = Integer.parseInt(args[2]);
+            int maxChunkSize = Integer.parseInt(args[3]);
+            int base = Integer.parseInt(args[4]);
+            String filePath = args[5];
+            upload(minChunkSize, avgChunkSize, maxChunkSize, base, filePath);
+            // System.out.println("filePath: " + filePath);
+        } else if (args[0].equals("download")) {
+            Index index = new Index();
+            index = index.readIndexFromFile("MyDedup.index");
+            System.out.println("Downloading");
+            System.out.println("file Recipe: " + index.fileRecipe);
+            // System.out.println("chunks: " + index.chunks.get("83a002e8ffbe10a8e5bfd289b565b247092a9b70")[0]);
+            String fileToDownload = args[1];
+            String localFileName = args[2];
+            download(index, fileToDownload, localFileName);
+        } else {
+            System.err.println("Usage: java MyDedup upload <min_chunk> <avg_chunk> <max_chunk> <d> <file_to_upload>");
+            System.err.println("Usage: java MyDedup download <file_to_download> <local_file_name>");
+            System.exit(1);
+        }
         // String content = "19648635";
         // byte[] fileData = content.getBytes();
 
@@ -374,7 +431,6 @@ public class MyDedup {
         //     e.printStackTrace();
         // }
 
-        upload(minChunkSize, avgChunkSize, maxChunkSize, base, filePath);
     }
 
     // ... rest of the class

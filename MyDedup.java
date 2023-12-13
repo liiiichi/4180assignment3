@@ -19,12 +19,14 @@ import java.util.*;
 import java.io.*;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Scanner;
 
 public class MyDedup {
+    static Scanner scanner = new Scanner(System.in);
+    private static int anachor (int value, int modulus) {
+        return value & (modulus - 1);
+    }
 
-    // private static int mod(int value, int modulus) {
-    //     return value & (modulus - 1);
-    // }
     private static class Chunk {
         byte[] chunkData;
         int startIndex = 0;
@@ -255,7 +257,7 @@ public class MyDedup {
         if (!recipeFolder.exists()){
             try{
                 recipeFolder.mkdir();
-                System.out.println("Data folder do not exist, created new folder");
+                System.out.println("File Recipe folder do not exist, created new folder");
             }catch (Exception e){
                 e.getStackTrace();
             }
@@ -298,11 +300,11 @@ public class MyDedup {
                 newChunk.endIndex = currentAnchor;
                 chunkList.add(newChunk);
                 lastAnchor = currentAnchor;
-                for(int x=0; x< newChunk.chunkData.length ; x++) {
-                    System.out.print(newChunk.chunkData[x] +" ");
-                }
-                System.out.println("Chunk len: " + newChunk.len);
-                System.out.println("===========================");
+                // for(int x=0; x< newChunk.chunkData.length ; x++) {
+                //     System.out.print(newChunk.chunkData[x] +" ");
+                // }
+                // System.out.println("Chunk len: " + newChunk.len);
+                // System.out.println("===========================");
                 break;
             }
             // before next Anchor Point, reach maxChunkSize
@@ -314,19 +316,19 @@ public class MyDedup {
                 newChunk.endIndex = currentAnchor;
                 chunkList.add(newChunk);
                 lastAnchor = currentAnchor;
-                for(int x=0; x< newChunk.chunkData.length ; x++) {
-                    System.out.print(newChunk.chunkData[x] +" ");
-                }
-                System.out.println("Chunk len: " + newChunk.len);
-                System.out.println("===========================");
-                i += minChunkSize;
+                // for(int x=0; x< newChunk.chunkData.length ; x++) {
+                //     System.out.print(newChunk.chunkData[x] +" ");
+                // }
+                // System.out.println("Chunk len: " + newChunk.len);
+                // System.out.println("===========================");
+                // i += minChunkSize;
                 continue;
             }
             // Calculate RFP
             if (i == 0){
                 for (int j = 0; j < minChunkSize; j++){
                     rfp += fileData[j] * (int) Math.pow(base, minChunkSize-1-j);
-                    System.out.println("Summation: " + rfp);
+                    // System.out.println("Summation: " + rfp);
                 }
                 rfp = mod(rfp, avgChunkSize);
                 System.out.println("first rfp = " + rfp);
@@ -338,24 +340,26 @@ public class MyDedup {
                 int dSecModMult = modMultiply(base, secPartMod, avgChunkSize);
                 rfp = modAdd(dSecModMult, fileData[i + minChunkSize - 1], avgChunkSize);
                 // rfp = mod((base * (tmp - baseTsModMult) + fileData[i + minChunkSize - 1]), avgChunkSize);
-                 System.out.println("next rfp = " + rfp);
+                System.out.println("next rfp = " + rfp);
             }
-            if (rfp == 0) {
+            if ( anachor(rfp, avgChunkSize) == 0 ) {
                 currentAnchor = i + minChunkSize - 1;
-                System.out.println("currentAnchor: " + currentAnchor);
+                // System.out.println("currentAnchor: " + currentAnchor);
                 byte[] chunkData = Arrays.copyOfRange(fileData, lastAnchor+1, currentAnchor + 1);
                 Chunk newChunk = new Chunk(chunkData, currentAnchor - lastAnchor);
                 newChunk.startIndex = lastAnchor + 1;
                 newChunk.endIndex = currentAnchor;
                 chunkList.add(newChunk);
                 lastAnchor = currentAnchor;
-                for(int x=0; x< newChunk.chunkData.length ; x++) {
-                    System.out.print(newChunk.chunkData[x] +" ");
-                }
-                System.out.println("Chunk len: " + newChunk.len);
-                System.out.println("===========================");
-                i += minChunkSize;
+                System.out.println("Chunked, starting index = " + newChunk.startIndex);
+                // for(int x=0; x< newChunk.chunkData.length ; x++) {
+                //     System.out.print(newChunk.chunkData[x] +" ");
+                // }
+                // System.out.println("Chunk len: " + newChunk.len);
+                // System.out.println("===========================");
+                // i += minChunkSize;
             }
+            // scanner.nextLine();
         }
 
         Container procContainer = new Container(fileName);
@@ -366,15 +370,16 @@ public class MyDedup {
         double bytesUnique = 0;
         int uniqueNum = 0;
         for (int i = 0; i < chunkList.size() ; i++) {
-            System.out.println("Chunk length = " + chunkList.get(i).len);
+            // System.out.println("Chunk length = " + chunkList.get(i).len);
             Chunk procChunk = chunkList.get(i);
+            System.out.println("Current Chunk Staring Index = " + procChunk.startIndex);
             bytesPreDedup += procChunk.len;
             try {
                 MessageDigest md = MessageDigest.getInstance("SHA-1");
                 md.update(procChunk.chunkData, 0, procChunk.len);
                 byte[] checkSumBytes = md.digest();
                 procChunk.hashVal = byteArrayToHexString(checkSumBytes);
-                System.out.println("checkSumStr: " + procChunk.hashVal);
+                // System.out.println("checkSumStr: " + procChunk.hashVal);
                 procFileRecipe.addChunkHash(procChunk.hashVal);
                 if (index.isChunkUnique(procChunk.hashVal)) {
                     // System.out.println("procContainer.uniqueChunkList Size = " + procContainer.uniqueChunkList.size());
@@ -397,7 +402,7 @@ public class MyDedup {
             }
         }
         procFileRecipe.saveFileRecipeToFile(fileName);
-        System.out.println("===========================");
+        // System.out.println("===========================");
         index.preDedupNum += chunkList.size();
         index.uniqueNum += uniqueNum;
         index.bytesPreDedup += bytesPreDedup;
@@ -421,7 +426,7 @@ public class MyDedup {
             deDupRatio = result.bytesPreDedup/result.bytesUnique;
         // }
         //System.out.println("filePath: " + (fileName + "container" + procContainer.containerId));
-        System.out.println("===========================");
+        // System.out.println("===========================");
         System.out.println("Report Output:");
         System.out.println("Total number of files that have been stored: " + result.fileNum);
         System.out.println("Total number of pre-deduplicated chunks in storage: " + result.preDedupNum);

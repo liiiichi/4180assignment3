@@ -415,9 +415,9 @@ public class MyDedup {
         for (int i = 0; i < chunkList.size() ; i++) {
             // System.out.println("Chunk length = " + chunkList.get(i).len);
             Chunk procChunk = chunkList.get(i);
-            System.out.println(procChunk.startIndex);
-            if (i == chunkList.size() - 1)
-                System.out.println((procChunk.endIndex + 1));
+            // System.out.println(procChunk.startIndex);
+            // if (i == chunkList.size() - 1)
+            //     System.out.println((procChunk.endIndex + 1));
             bytesPreDedup += procChunk.len;
             try {
                 MessageDigest md = MessageDigest.getInstance("SHA-1");
@@ -493,7 +493,7 @@ public class MyDedup {
         System.out.println("Total number of bytes of unique chunks in storage: "+ result.bytesUnique);
         System.out.println("Total number of containers in storage: " + result.containerNum);
         System.out.printf("Deduplication ratio: %.2f\n", deDupRatio);
-        System.out.println("Upload Complete");
+        // System.out.println("Upload Complete");
     }
 
     public static void download(Index index, String fileToDownload, String localFileName) {
@@ -541,7 +541,7 @@ public class MyDedup {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        System.out.println("Download Complete");
+        // System.out.println("Download Complete");
     }
 
     public static void main(String[] args) {
@@ -552,7 +552,7 @@ public class MyDedup {
         }
 
         if (args[0].equals("upload")) {
-            System.out.println("Uploading");
+            // System.out.println("Uploading");
             int minChunkSize = Integer.parseInt(args[1]);
             int avgChunkSize = Integer.parseInt(args[2]);
             int maxChunkSize = Integer.parseInt(args[3]);
@@ -563,7 +563,7 @@ public class MyDedup {
         } else if (args[0].equals("download")) {
             Index index = new Index();
             index = index.readIndexFromFile("MyDedup.index");
-            System.out.println("Downloading");
+            // System.out.println("Downloading");
             // System.out.println("chunks: " + index.chunks.get("83a002e8ffbe10a8e5bfd289b565b247092a9b70")[0]);
             String fileToDownload = args[1];
             String localFileName = args[2];

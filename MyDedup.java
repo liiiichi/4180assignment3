@@ -49,7 +49,7 @@ public class MyDedup {
         // public Map<String, List<String>> fileRecipe;
         public Map<String, String> hashIndex;
         public double bytesPreDedup, bytesUnique;
-        public int preDedupNum, uniqueNum, fileNum;
+        public int preDedupNum, uniqueNum, fileNum, containerNum;
         // public int containerNum;
 
         public Index() {
@@ -458,7 +458,6 @@ public class MyDedup {
         } else {
             index.fileNum = 0;
         }
-        
         // index.containerNum += procContainer.containerId;
 
         // System.out.println("preDedupNum: " + index.preDedupNum);
@@ -472,6 +471,12 @@ public class MyDedup {
 
         Index result = new Index();
         result = result.readIndexFromFile("MyDedup.index");
+        File[] datas = dataFolder.listFiles();
+        if (datas != null) {
+            result.containerNum = datas.length;
+        } else {
+            result.containerNum = 0;
+        }
         double deDupRatio = 0;
         // if (bytesUnique == 0) {
         //     deDupRatio = 0;
@@ -486,7 +491,7 @@ public class MyDedup {
         System.out.println("Total number of unique chunks in storage: " + result.uniqueNum);
         System.out.println("Total number of bytes of pre-deduplicated chunks in storage: " + result.bytesPreDedup);
         System.out.println("Total number of bytes of unique chunks in storage: "+ result.bytesUnique);
-        System.out.println("Total number of containers in storage: " + procContainer.containerId);
+        System.out.println("Total number of containers in storage: " + result.containerNum);
         System.out.printf("Deduplication ratio: %.2f\n", deDupRatio);
         System.out.println("Upload Complete");
     }

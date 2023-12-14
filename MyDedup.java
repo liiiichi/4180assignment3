@@ -312,6 +312,13 @@ public class MyDedup {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        // try{
+        // Path path = Paths.get(filePath);
+        // fileData = Files.readAllBytes(path);
+        // // double fileSize = Files.size(path); // Get file size
+        // } catch (IOException e) {
+        //     e.printStackTrace();
+        // }
         List<Chunk> chunkList = new ArrayList<Chunk>();
         Chunk achorChunk = new Chunk();
         achorChunk.endIndex = -1;
@@ -336,7 +343,7 @@ public class MyDedup {
             }
 
             for (x = 0; x < minChunkSize; x++) {
-                rfp = modAdd(modMultiply(rfp, base, avgChunkSize), (fileData[x] & 0xFF), avgChunkSize);
+                rfp = modAdd(modMultiply(rfp, base, avgChunkSize), (fileData[x] & 0xff), avgChunkSize);
                 // System.out.println("rfp: " + rfp);
             }
             for (x = 0; x <= fileData.length - minChunkSize; x++) {

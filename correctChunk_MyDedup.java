@@ -22,6 +22,7 @@ import java.nio.file.Paths;
 import java.util.Scanner;
 
 public class MyDedup {
+    
     static Scanner scanner = new Scanner(System.in);
     private static int anachor (int value, int modulus) {
         return value & (modulus - 1);
@@ -272,27 +273,26 @@ public class MyDedup {
         try{
         Path path = Paths.get(filePath);
         fileData = Files.readAllBytes(path);
-        // System.out.println("Data sequence: " + fileData[8]);
         // double fileSize = Files.size(path); // Get file size
-        // System.out.println("File size: " + fileSize + " bytes");
         } catch (IOException e) {
             e.printStackTrace();
         }
-        
         List<Chunk> chunkList = new ArrayList<Chunk>();
         int rfp = 0;
         int lastAnchor = -1;
         int currentAnchor = 0;
         int checkAnchor;
-        for (int i = 0; i < fileData.length+1; i++){
-            // Single Chunk can store the whole file
-            // if (maxChunkSize >= fileData.length){
-            //     chunkList.add(new Chunk(fileData, fileData.length));
-            //     break;
-            // }
-
+        int h = 1;
+        int x;
+        for (x = 0; x < minChunkSize - 1; x++)
+            h = (h * base) % avgChunkSize;
+        for (x = 0; x < minChunkSize; x++) {
+            rfp = (base * rfp + fileData[x]) % avgChunkSize;
+        }
+        // Slide the pattern over text one by one
+        for (x = 0; x <= fileData.length - minChunkSize; x++) {
             // EOF
-            if (i + minChunkSize >= fileData.length) {
+            if (x + minChunkSize >= fileData.length) {
                 currentAnchor = fileData.length - 1;
                 byte[] chunkData = Arrays.copyOfRange(fileData, lastAnchor+1, currentAnchor + 1);
                 Chunk newChunk = new Chunk(chunkData, currentAnchor - lastAnchor);
@@ -300,15 +300,11 @@ public class MyDedup {
                 newChunk.endIndex = currentAnchor;
                 chunkList.add(newChunk);
                 lastAnchor = currentAnchor;
-                // for(int x=0; x< newChunk.chunkData.length ; x++) {
-                //     System.out.print(newChunk.chunkData[x] +" ");
-                // }
-                // System.out.println("Chunk len: " + newChunk.len);
-                // System.out.println("===========================");
                 break;
             }
+
             // before next Anchor Point, reach maxChunkSize
-            if (((checkAnchor = i + minChunkSize - 1) - lastAnchor) == maxChunkSize) {
+            if (((checkAnchor = x + minChunkSize - 1) - lastAnchor) == maxChunkSize) {
                 currentAnchor = checkAnchor;
                 byte[] chunkData = Arrays.copyOfRange(fileData, lastAnchor+1, currentAnchor + 1);
                 Chunk newChunk = new Chunk(chunkData, currentAnchor - lastAnchor);
@@ -316,50 +312,31 @@ public class MyDedup {
                 newChunk.endIndex = currentAnchor;
                 chunkList.add(newChunk);
                 lastAnchor = currentAnchor;
-                // for(int x=0; x< newChunk.chunkData.length ; x++) {
-                //     System.out.print(newChunk.chunkData[x] +" ");
-                // }
-                // System.out.println("Chunk len: " + newChunk.len);
-                // System.out.println("===========================");
-                // i += minChunkSize;
                 continue;
             }
-            // Calculate RFP
-            if (i == 0){
-                for (int j = 0; j < minChunkSize; j++){
-                    rfp += fileData[j] * (int) Math.pow(base, minChunkSize-1-j);
-                    // System.out.println("Summation: " + rfp);
-                }
-                rfp = mod(rfp, avgChunkSize);
-                System.out.println("first rfp = " + rfp);
-            }
-            else {
-                int tmp = rfp;
-                int baseTsModMult = modMultiply(fileData[i], (int) Math.pow(base, minChunkSize - 1), avgChunkSize);
-                int secPartMod = tmp - baseTsModMult;
-                int dSecModMult = modMultiply(base, secPartMod, avgChunkSize);
-                rfp = modAdd(dSecModMult, fileData[i + minChunkSize - 1], avgChunkSize);
-                // rfp = mod((base * (tmp - baseTsModMult) + fileData[i + minChunkSize - 1]), avgChunkSize);
-                System.out.println("next rfp = " + rfp);
-            }
-            if ( anachor(rfp, avgChunkSize) == 0 ) {
-                currentAnchor = i + minChunkSize - 1;
-                // System.out.println("currentAnchor: " + currentAnchor);
-                byte[] chunkData = Arrays.copyOfRange(fileData, lastAnchor+1, currentAnchor + 1);
+
+            if (anachor(rfp, avgChunkSize) == 0) {
+                currentAnchor = x + minChunkSize - 1;
+                byte[] chunkData = Arrays.copyOfRange(fileData, lastAnchor + 1, currentAnchor + 1);
                 Chunk newChunk = new Chunk(chunkData, currentAnchor - lastAnchor);
                 newChunk.startIndex = lastAnchor + 1;
                 newChunk.endIndex = currentAnchor;
                 chunkList.add(newChunk);
                 lastAnchor = currentAnchor;
-                System.out.println("Chunked, starting index = " + newChunk.startIndex);
-                // for(int x=0; x< newChunk.chunkData.length ; x++) {
-                //     System.out.print(newChunk.chunkData[x] +" ");
-                // }
-                // System.out.println("Chunk len: " + newChunk.len);
-                // System.out.println("===========================");
-                // i += minChunkSize;
             }
-            // scanner.nextLine();
+
+            // Calculate hash value for next window of text:
+            // Remove leading digit, add trailing digit
+            if (x < fileData.length - minChunkSize) {
+                rfp = (base * (rfp - fileData[x] * h)
+                     + fileData[x + minChunkSize])
+                    % avgChunkSize;
+ 
+                // We might get negative value of t,
+                // converting it to positive
+                if (rfp < 0)
+                    rfp = (rfp + minChunkSize);
+            }
         }
 
         Container procContainer = new Container(fileName);
@@ -517,19 +494,6 @@ public class MyDedup {
             System.err.println("Usage: java MyDedup download <file_to_download> <local_file_name>");
             System.exit(1);
         }
-        // String content = "19648635";
-        // byte[] fileData = content.getBytes();
-
-        // Path path = Paths.get("output.txt");
-        // try {
-        //     Files.write(path, fileData);
-        //     System.out.println("File created successfully.");
-        // } catch (IOException e) {
-        //     e.printStackTrace();
-        // }
-
     }
-
-    // ... rest of the class
 }
 

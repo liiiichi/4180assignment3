@@ -22,8 +22,9 @@ import java.nio.file.Paths;
 import java.util.Scanner;
 
 public class MyDedup {
+    
     static Scanner scanner = new Scanner(System.in);
-    private static int anachor (int value, int modulus) {
+    private static int mod (int value, int modulus) {
         return value & (modulus - 1);
     }
 
@@ -48,7 +49,8 @@ public class MyDedup {
         // public Map<String, List<String>> fileRecipe;
         public Map<String, String> hashIndex;
         public double bytesPreDedup, bytesUnique;
-        public int preDedupNum, uniqueNum, fileNum, containerNum;
+        public int preDedupNum, uniqueNum, fileNum;
+        // public int containerNum;
 
         public Index() {
             // fileRecipe = new HashMap<>();
@@ -171,8 +173,22 @@ public class MyDedup {
         public Container(String fileName) {
             uniqueChunkList = new ArrayList<>();
             currentSize = 0;
-            containerId = 1;
+            containerId = getNextContainerId();
             // containerName = fileName;
+        }
+
+        private int getNextContainerId() {
+            File dataDir = new File("data/");
+            if (!dataDir.exists()) {
+                dataDir.mkdirs(); // Create the directory if it doesn't exist
+            }
+
+            File[] files = dataDir.listFiles();
+            if (files != null) {
+                return files.length; // Set containerId to the number of files in the directory
+            } else {
+                return 0; // If the directory is empty, start with 0
+            }
         }
 
         public boolean addChunk(Chunk chunk) {
@@ -219,9 +235,9 @@ public class MyDedup {
 
     }
 
-    private static int mod(int value, int modulus) {
-        return ((value % modulus) + modulus) % modulus;
-    }
+    // private static int mod(int value, int modulus) {
+    //     return ((value % modulus) + modulus) % modulus;
+    // }
 
     private static int modAdd(int a, int b, int modulus) {
         return (mod(a, modulus) + mod(b, modulus)) % modulus;
@@ -269,116 +285,117 @@ public class MyDedup {
         if (dotIndex > 0) { // Check if there's an extension
             fileName = fileName.substring(0, dotIndex);
         }
-        try{
-        Path path = Paths.get(filePath);
-        fileData = Files.readAllBytes(path);
-        // System.out.println("Data sequence: " + fileData[8]);
-        // double fileSize = Files.size(path); // Get file size
-        // System.out.println("File size: " + fileSize + " bytes");
+        try {
+            InputStream inputStream = new FileInputStream(filePath);
+
+            // Get the size of the file
+            long fileSize = new File(filePath).length();
+
+            // Ensure that the file size is not larger than Integer.MAX_VALUE
+            if (fileSize > Integer.MAX_VALUE) {
+                throw new IOException("File is too large");
+            }
+
+            // Read the file data
+            fileData = new byte[(int) fileSize];
+            int bytesRead = 0;
+            while (bytesRead < fileSize) {
+                int result = inputStream.read(fileData, bytesRead, (int) fileSize - bytesRead);
+                if (result == -1) break; // End of file reached
+                bytesRead += result;
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
-        
         List<Chunk> chunkList = new ArrayList<Chunk>();
+        Chunk achorChunk = new Chunk();
+        achorChunk.endIndex = -1;
         int rfp = 0;
         int lastAnchor = -1;
         int currentAnchor = 0;
         int checkAnchor;
-        for (int i = 0; i < fileData.length+1; i++){
-            // Single Chunk can store the whole file
-            // if (maxChunkSize >= fileData.length){
-            //     chunkList.add(new Chunk(fileData, fileData.length));
-            //     break;
-            // }
+        int h = 1;
+        int x;
+        for (x = 0; x < minChunkSize - 1; x++){
+            h = modMultiply(h, base, avgChunkSize);
+        }
 
+        for (x = 0; x < minChunkSize; x++) {
+            rfp = modAdd(modMultiply(rfp, base, avgChunkSize), (fileData[x] & 0xFF), avgChunkSize);
+            // System.out.println("rfp: " + rfp);
+        }
+        // System.out.println("first rfp: " + rfp);
+        // Slide the pattern over text one by one
+        for (x = 0; x <= fileData.length - minChunkSize; x++) {
             // EOF
-            if (i + minChunkSize >= fileData.length) {
+            if (x + minChunkSize >= fileData.length) {
                 currentAnchor = fileData.length - 1;
                 byte[] chunkData = Arrays.copyOfRange(fileData, lastAnchor+1, currentAnchor + 1);
                 Chunk newChunk = new Chunk(chunkData, currentAnchor - lastAnchor);
                 newChunk.startIndex = lastAnchor + 1;
                 newChunk.endIndex = currentAnchor;
+                achorChunk = newChunk;
                 chunkList.add(newChunk);
                 lastAnchor = currentAnchor;
-                // for(int x=0; x< newChunk.chunkData.length ; x++) {
-                //     System.out.print(newChunk.chunkData[x] +" ");
-                // }
-                // System.out.println("Chunk len: " + newChunk.len);
-                // System.out.println("===========================");
                 break;
             }
+
             // before next Anchor Point, reach maxChunkSize
-            if (((checkAnchor = i + minChunkSize - 1) - lastAnchor) == maxChunkSize) {
+            if (((checkAnchor = x + minChunkSize - 1) - lastAnchor) == maxChunkSize) {
                 currentAnchor = checkAnchor;
                 byte[] chunkData = Arrays.copyOfRange(fileData, lastAnchor+1, currentAnchor + 1);
                 Chunk newChunk = new Chunk(chunkData, currentAnchor - lastAnchor);
                 newChunk.startIndex = lastAnchor + 1;
                 newChunk.endIndex = currentAnchor;
+                achorChunk = newChunk;
                 chunkList.add(newChunk);
                 lastAnchor = currentAnchor;
-                // for(int x=0; x< newChunk.chunkData.length ; x++) {
-                //     System.out.print(newChunk.chunkData[x] +" ");
-                // }
-                // System.out.println("Chunk len: " + newChunk.len);
-                // System.out.println("===========================");
-                // i += minChunkSize;
-                continue;
+                // continue;
             }
-            // Calculate RFP
-            if (i == 0){
-                for (int j = 0; j < minChunkSize; j++){
-                    rfp += fileData[j] * (int) Math.pow(base, minChunkSize-1-j);
-                    // System.out.println("Summation: " + rfp);
-                }
-                rfp = mod(rfp, avgChunkSize);
-                System.out.println("first rfp = " + rfp);
-            }
-            else {
-                int tmp = rfp;
-                int baseTsModMult = modMultiply(fileData[i], (int) Math.pow(base, minChunkSize - 1), avgChunkSize);
-                int secPartMod = tmp - baseTsModMult;
-                int dSecModMult = modMultiply(base, secPartMod, avgChunkSize);
-                rfp = modAdd(dSecModMult, fileData[i + minChunkSize - 1], avgChunkSize);
-                // rfp = mod((base * (tmp - baseTsModMult) + fileData[i + minChunkSize - 1]), avgChunkSize);
-                System.out.println("next rfp = " + rfp);
-            }
-            if ( anachor(rfp, avgChunkSize) == 0 ) {
-                currentAnchor = i + minChunkSize - 1;
+
+            if (rfp == 0 && x > achorChunk.endIndex) {
+                currentAnchor = x + minChunkSize - 1;
                 // System.out.println("currentAnchor: " + currentAnchor);
-                byte[] chunkData = Arrays.copyOfRange(fileData, lastAnchor+1, currentAnchor + 1);
+                byte[] chunkData = Arrays.copyOfRange(fileData, lastAnchor + 1, currentAnchor + 1);
                 Chunk newChunk = new Chunk(chunkData, currentAnchor - lastAnchor);
                 newChunk.startIndex = lastAnchor + 1;
                 newChunk.endIndex = currentAnchor;
+                achorChunk = newChunk;
                 chunkList.add(newChunk);
                 lastAnchor = currentAnchor;
-                System.out.println("Chunked, starting index = " + newChunk.startIndex);
-                // for(int x=0; x< newChunk.chunkData.length ; x++) {
-                //     System.out.print(newChunk.chunkData[x] +" ");
-                // }
-                // System.out.println("Chunk len: " + newChunk.len);
-                // System.out.println("===========================");
-                // i += minChunkSize;
             }
-            // scanner.nextLine();
+
+            // Calculate hash value for next window of text:
+            // Remove leading digit, add trailing digit
+            if (x < fileData.length - minChunkSize) {
+                // Calculate the subtracted value
+                int subtractedValue = modMultiply(fileData[x] & 0xff, h, avgChunkSize);
+                // Subtract and then multiply by base
+                rfp = modMultiply(base, mod(rfp - subtractedValue, avgChunkSize), avgChunkSize);
+                // Finally, add the new byte
+                rfp = modAdd(rfp, fileData[x + minChunkSize] & 0xff, avgChunkSize);
+                // System.out.println("Then rfp: " + rfp + " id: " + (x+1));
+            }
         }
 
         Container procContainer = new Container(fileName);
         Index index = new Index();
         FileRecipe procFileRecipe = new FileRecipe();
         index = index.readIndexFromFile("MyDedup.index");
-        if (index.containerNum == 0){
-            procContainer.containerId = 1;
-        }
-        else{
-            procContainer.containerId = index.containerNum;
-        }
+        // if (index.containerNum == 0){
+        //     procContainer.containerId = 1;
+        // }
+        // else{
+        //     procContainer.containerId = index.containerNum;
+        // }
         double bytesPreDedup = 0;
         double bytesUnique = 0;
         int uniqueNum = 0;
+        // System.out.println("chunkList.size: " + chunkList.size());
         for (int i = 0; i < chunkList.size() ; i++) {
             // System.out.println("Chunk length = " + chunkList.get(i).len);
             Chunk procChunk = chunkList.get(i);
-            System.out.println("Current Chunk Staring Index = " + procChunk.startIndex);
+            System.out.println(procChunk.startIndex);
             bytesPreDedup += procChunk.len;
             try {
                 MessageDigest md = MessageDigest.getInstance("SHA-1");
@@ -413,8 +430,15 @@ public class MyDedup {
         index.uniqueNum += uniqueNum;
         index.bytesPreDedup += bytesPreDedup;
         index.bytesUnique += bytesUnique;
-        index.fileNum++;
-        index.containerNum += procContainer.containerId;
+        File[] recipes = recipeFolder.listFiles();
+        if (recipes != null) {
+            index.fileNum = recipes.length;
+        } else {
+            index.fileNum = 0;
+        }
+        
+        // index.containerNum += procContainer.containerId;
+
         // System.out.println("preDedupNum: " + index.preDedupNum);
         // System.out.println("uniqueNum: " + index.uniqueNum);
         // System.out.println("bytesPreDedup: " + index.bytesPreDedup);
@@ -517,19 +541,6 @@ public class MyDedup {
             System.err.println("Usage: java MyDedup download <file_to_download> <local_file_name>");
             System.exit(1);
         }
-        // String content = "19648635";
-        // byte[] fileData = content.getBytes();
-
-        // Path path = Paths.get("output.txt");
-        // try {
-        //     Files.write(path, fileData);
-        //     System.out.println("File created successfully.");
-        // } catch (IOException e) {
-        //     e.printStackTrace();
-        // }
-
     }
-
-    // ... rest of the class
 }
 

@@ -1,10 +1,56 @@
-./rfp_anchor_linux64 8 16 32 16 0 KJV12.TXT
+./rfp_anchor_linux64 16 257 8192 13 0 rfp_anchor_linux32
+
 m: the window size (in bytes)
 q: the modulo parameter
 x: the maximum chunk size (in bytes)
 d: the base parameter
 v: the matching value that determines if a rabin fingerprint is an anchor point
 
+result:
+0
+296
+413
+515
+536
+768
+2826
+2993
+3126
+3740
+3756
+3772
+4110
+4185
+4201
+5421
+5633
+6252
+6918
+7123
+7509
+
 java MyDedup upload <min_chunk> <avg_chunk> <max_chunk> <d> <file_to_upload>
 
 m q x d (without v)
+
+./rfp_anchor_linux64 2 4 8 13 0 number.txt
+0
+8
+16
+18
+24
+26
+34
+36
+44
+51
+54
+57
+Data: 49 Base: 13 Current Power:1
+Summation: 637
+Data: 50 Base: 13 Current Power:0
+Summation: 687
+first rfp = 3
+next rfp = 0
+currentAnchor: 2
+49 50 51 Chunk len: 3

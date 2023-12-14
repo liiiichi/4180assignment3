@@ -144,8 +144,8 @@ public class MyDedup {
                 String recipeFileName = "file//" + fileName;
                 File recipeFile = new File(recipeFileName);
                 if (!recipeFile.exists()) {
-                    System.out.println("File recipe does not exist. Returning a new file recipe.");
-                    return new FileRecipe(); // Return a new FileRecipe if the file does not exist
+                    System.err.println("File recipe does not exist.");
+                    System.exit(1); // Return a new FileRecipe if the file does not exist
                 }
                 try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(recipeFile))) {
                     return (FileRecipe) ois.readObject();
@@ -280,6 +280,11 @@ public class MyDedup {
         }
         byte[] fileData = null;
         File file = new File(filePath);
+       // Check if the file exists
+        if (!file.exists()) {
+            System.err.println("Error: File does not exist.");
+            System.exit(1); // Exit the program
+        }
         String fileName = file.getName();
         int dotIndex = fileName.lastIndexOf('.');
         if (dotIndex > 0) { // Check if there's an extension
@@ -405,7 +410,7 @@ public class MyDedup {
             Chunk procChunk = chunkList.get(i);
             System.out.println(procChunk.startIndex);
             if (i == chunkList.size() - 1)
-                System.out.println(procChunk.endIndex);
+                System.out.println((procChunk.endIndex + 1));
             bytesPreDedup += procChunk.len;
             try {
                 MessageDigest md = MessageDigest.getInstance("SHA-1");

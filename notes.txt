@@ -32,3 +32,25 @@ result:
 java MyDedup upload <min_chunk> <avg_chunk> <max_chunk> <d> <file_to_upload>
 
 m q x d (without v)
+
+./rfp_anchor_linux64 2 4 8 13 0 number.txt
+0
+8
+16
+18
+24
+26
+34
+36
+44
+51
+54
+57
+Data: 49 Base: 13 Current Power:1
+Summation: 637
+Data: 50 Base: 13 Current Power:0
+Summation: 687
+first rfp = 3
+next rfp = 0
+currentAnchor: 2
+49 50 51 Chunk len: 3

@@ -480,7 +480,12 @@ public class MyDedup {
     }
 
     public static void download(Index index, String fileToDownload, String localFileName) {
-        String fileNameWithoutExtension = fileToDownload.substring(0, fileToDownload.lastIndexOf('.'));
+        String fileNameWithoutExtension = fileToDownload;
+        int lastDotIndex = fileToDownload.lastIndexOf('.');
+
+        if (lastDotIndex > 0) {
+            fileNameWithoutExtension = fileToDownload.substring(0, lastDotIndex);
+        }
         String path = "data//";
         FileRecipe fileRecipe = FileRecipe.readFileRecipeFromFile(fileNameWithoutExtension);
         Map<Integer, ArrayList<byte[]>> containerCache = new HashMap<>();
